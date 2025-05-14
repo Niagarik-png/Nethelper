@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primaryBg: #4e6e5d;
+  --color-textPrimary: #815355;
+  --color-hoverPrimary: #dfa06e;
+  --color-hoverSecondary: #f5f3bb;
+  --color-borderPrimary: #93b1a7;
+  --color-cardBg: #f5f3bb;
+  --color-footerBg: #000;
+  --color-footerText: #dbfeb8;
+}
+
+body {
+  font-family: "Manrope", sans-serif;
+  background-color: white;
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Montserrat", sans-serif;
+  color: #815355;
+}
+
+
