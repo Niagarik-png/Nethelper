@@ -12,44 +12,77 @@ const DashboardPage = () => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    if (user) {
-      setBookings([
-        {
-          id: 1,
-          specialist: "Иван Петров",
-          date: "12.05.2025",
-          service: "Настройка VPN",
-        },
-      ]);
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetchUserData(token);
+      fetchBookings(token);
     }
-  }, [user]);
+  }, []);
+
+  const fetchUserData = async (token) => {
+    try {
+      const response = await fetch("http://localhost:1337/api/users/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setUser({
+          id: data.id,
+          email: data.email,
+          role: data.role,
+          isAuthenticated: true,
+        });
+      } else {
+        localStorage.removeItem("token");
+      }
+    } catch (error) {
+      console.error("Ошибка загрузки данных пользователя:", error);
+      localStorage.removeItem("token");
+    }
+  };
+
+  const fetchBookings = async (token) => {
+    try {
+      const response = await fetch(
+        "http://localhost:1337/api/bookings?filters[client_id][$eq]=me&populate=*",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setBookings(
+          data.data.map((booking) => ({
+            id: booking.id,
+            specialist: booking.attributes.specialist.data.attributes.name,
+            date: booking.attributes.date,
+            service: booking.attributes.service.data.attributes.title,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Ошибка загрузки бронирований:", error);
+    }
+  };
 
   const handleLogin = async () => {
     try {
       const response = await fetch("http://localhost:1337/api/auth/local", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          identifier: email, // Strapi использует "identifier" вместо "email"
-          password,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: email, password }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error?.message || "Неверный email или пароль");
-      }
-
-      // Успешный вход
+      if (!response.ok)
+        throw new Error(data.error?.message || "Неверные данные");
       setUser({
+        id: data.user.id,
         email: data.user.email,
-        role: data.user.role?.name || "user",
+        role: data.user.role,
         isAuthenticated: true,
       });
-      localStorage.setItem("token", data.jwt); // Сохраняем JWT токен
+      localStorage.setItem("token", data.jwt);
+      fetchBookings(data.jwt);
       navigate("/dashboard");
     } catch {
       alert("Неверный email или пароль. Попробуйте снова.");
@@ -59,6 +92,8 @@ const DashboardPage = () => {
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("token");
+    setBookings([]);
+    navigate("/dashboard");
   };
 
   if (!user) {
@@ -70,11 +105,11 @@ const DashboardPage = () => {
           </h2>
           <div className="bg-cardBg border border-borderPrimary p-4 rounded-lg max-w-md mx-auto hover:shadow-md">
             <Form.Root
-              className="space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 handleLogin();
               }}
+              className="space-y-4"
             >
               <Form.Field name="email">
                 <div className="flex flex-col space-y-1">
@@ -120,7 +155,7 @@ const DashboardPage = () => {
                 </div>
               </Form.Field>
               <Form.Submit asChild>
-                <button className="bg-hoverPrimary text-textPrimary font-semibold px-6 py-2 rounded-lg w-full hover:bg-hoverSecondary focus:ring-2 focus:ring-hoverPrimary focus:outline-none">
+                <button className="w-full bg-hoverPrimary text-textPrimary font-semibold px-6 py-2 rounded-lg hover:bg-hoverSecondary focus:ring-2 focus:ring-hoverPrimary focus:outline-none">
                   Войти
                 </button>
               </Form.Submit>
@@ -154,7 +189,7 @@ const DashboardPage = () => {
             Привет, {user.email}!
           </h3>
           <p className="text-center text-sm sm:text-base text-textPrimary mb-4">
-            Роль: {user.role === "admin" ? "Администратор" : "Пользователь"}
+            Роль: {user.role}
           </p>
           {user.role === "admin" && (
             <Link
@@ -162,6 +197,14 @@ const DashboardPage = () => {
               className="block text-center bg-hoverPrimary text-textPrimary font-semibold px-6 py-2 rounded-lg hover:bg-hoverSecondary mb-4"
             >
               Перейти в админ-панель
+            </Link>
+          )}
+          {user.role === "client" && (
+            <Link
+              to="/booking"
+              className="block text-center bg-hoverPrimary text-textPrimary font-semibold px-6 py-2 rounded-lg hover:bg-hoverSecondary mb-4"
+            >
+              Записаться на консультацию
             </Link>
           )}
           <h4 className="text-lg sm:text-xl font-medium mb-2 text-textPrimary">
@@ -175,7 +218,7 @@ const DashboardPage = () => {
                   className="p-2 border border-borderPrimary rounded-lg"
                 >
                   <p>Специалист: {booking.specialist}</p>
-                  <p>Дата: {booking.date}</p>
+                  <p>Дата: {new Date(booking.date).toLocaleString()}</p>
                   <p>Услуга: {booking.service}</p>
                 </li>
               ))}
